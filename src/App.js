@@ -1,29 +1,48 @@
 import React from "react";
 import "antd/dist/antd.css";
 import Bucket from "./Bucket"
-import { message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
+import { Breadcrumb, message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
 import moment from "moment";
 
 class App extends React.Component {
+  state = {
+    bucket: {},
+    seraching: false,
+    tree: [],
+    files: [],
+    data: []
+  };
+
   constructor(props) {
     super(props);
-
-    this.state = {
-      tree: [],
-      files: [],
-      results: []
-    };
+    this.breadcrumbs = <div></div>;
   }
 
   componentDidMount() {
-    let bucket = new Bucket('https://cellgeni.cog.sanger.ac.uk');
-
+    let bucket = new Bucket();
+  
     this.setState({
-      searching: false,
+      bucket: bucket,
       tree: bucket.tree,
       files: bucket.files,
-      results: bucket.tree
-    });
+      data: bucket.tree
+    }, this.buildBreadcrumbs);
+  }
+
+
+  buildBreadcrumbs(){
+    let crumbs = this.state.bucket.name;
+    if(this.state.bucket.shared){
+      crumbs += '/'+this.state.bucket.shared;
+    }
+    crumbs = crumbs.split('/')
+    this.breadcrumbs = (
+      <Breadcrumb>
+      {crumbs.map((item, key) =>        
+        <Breadcrumb.Item key={key}>{item}</Breadcrumb.Item>
+      )}
+      </Breadcrumb>
+    );
   }
 
   // src: https://stackoverflow.com/questions/20459630/javascript-human-readable-filesize
@@ -38,8 +57,7 @@ class App extends React.Component {
   }
 
   onRowClick = (record, index, event) => {
-    //console.log("Row click", { record: record, index: index, event: event });
-    console.log("Row click", record);
+    console.log("Row click", { record: record, index: index, event: event });
   };
 
   onRowDoubleClick = (record, index, event) => {
@@ -73,10 +91,16 @@ class App extends React.Component {
       key: "actions",
       width: "10%",
       render: (key, record, index) => {
-        let download = <Button icon="download" shape="round" onClick={this.handleDownload.bind(null, record)}/>;
+        let download = (
+          <Tooltip title={`Download this file (${record.name})`}>
+            <Button icon="download" shape="round" onClick={this.handleDownload.bind(null, record)}/>
+          </Tooltip>
+        );
         return (
           <Button.Group size="small">
-            <Button icon="link" shape="round" onClick={this.handleShare.bind(null, record)}/>
+            <Tooltip title={`Share this item (${record.name})`}>
+              <Button icon="link" shape="round" onClick={this.handleShare.bind(null, record)}/>
+            </Tooltip>
             {record.type === "file" ? download : ""}
           </Button.Group>
         );
@@ -99,12 +123,12 @@ class App extends React.Component {
         } else {
           return "";
         }
-      },
+      }/*,
       onCell: (record, index) => ({
         onClick(e) {
           console.log("Click cell", ` row ${index}`, record, e.target);
         }
-      })
+      })*/
     },
     {
       title: "Size",
@@ -185,10 +209,7 @@ class App extends React.Component {
           <span>Copy the following link:</span>
           <Input id="shareable-link" addonAfter={<Icon type="link" />} value={record.share} onClick={copyShareableLink} readOnly/>
         </div>
-      ),
-      onOk() {
-        console.log('OK');
-      }
+      )
     });
     
     event.stopPropagation();
@@ -206,22 +227,24 @@ class App extends React.Component {
     var searchResults = [];
     var term = event.target.value.toLowerCase();
     if (term && term.length >= 3) {
-      this.setState( state => ({searching:true}));
+      this.setState({searching:true});
       searchResults = this.state.files.filter(f =>
         f.name.toLowerCase().includes(term)
       );
     } else {
-      this.setState( state => ({searching:false}));
+      this.setState({searching:false});
       searchResults = this.state.tree;
     }
-    this.setState(state => ({ results: searchResults }));
+    this.setState({data: searchResults });
   }
 
   //footer = () => <span>{this.state.files.length} file(s)</span>;
+  
 
   render() {
     return (
       <div>
+        {this.breadcrumbs}
         <Tooltip title="Search for file. Input at least 3 characaters.">
           <Input
             prefix={<Icon type="file-search" />}
@@ -234,7 +257,7 @@ class App extends React.Component {
           pagination={false}
           expandIcon={this.folderExpandIcon.bind(this)}
           columns={this.columns}
-          dataSource={this.state.results}
+          dataSource={this.state.data}
           //footer={this.footer}
           onRow={(record, index) => ({
             onClick: this.onRowClick.bind(null, record, index),
