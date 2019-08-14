@@ -1,4 +1,4 @@
-import { testData } from "./RawData";
+//import { testData } from "./RawData";
 
 export default class Bucket {
 
@@ -34,7 +34,7 @@ export default class Bucket {
 
 
   constructor(){
-    console.log(document.currentScript);
+    console.log('currentScript)', document.currentScript);
 
     // get url from current location
     this.bucketUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':'+window.location.port : ''}`;
@@ -81,8 +81,6 @@ export default class Bucket {
   // the tree builds from the bucketRoot
   addTreeNode(item) {
     var folders = item.key.split("/");
-    //if(this.shared)
-    //  folders = item.key.replace(this.shared, this.shared.split("/").pop()).split("/");
     folders.pop(); // remove file name
     var path = this._bucketRoot;
     while (folders.length !== 0) {
@@ -124,10 +122,6 @@ export default class Bucket {
     }
   }
 
-  getBucketKey(){
-    return `/${this.bucketName}/`;
-  }
-
   // fetch xml data from the bucket
   fetchBucketData(marker){
     var url = this.bucketUrl;
@@ -151,6 +145,7 @@ export default class Bucket {
       if(!this.shared || file.key.startsWith(this.shared)){
         //add file to list
         this._files.push(file);
+        // might be better to sort everthing afterwards?
         this._files.sort(this.sorter);
         //add file as leaf to the tree
         this.addTreeNode(file);
@@ -158,13 +153,26 @@ export default class Bucket {
     }
   }
 
+  // remove previous folders up to the shared one
+  trimTree(){
+    let path = this.shared.replace(/^\/|\/$/g, '').split('/');
+    let branch = this._bucketRoot.children;
+    while(path.length>0){
+      let name = path.shift()
+      let item = branch.find(c => c.name === name);
+      if(!item) break;
+      branch = item.children;
+    }
+    this._bucketRoot.children = branch;
+  }
+
   // release the kraken and fetch the files
   getContentes() {
     // get the data
-    var dom = new window.DOMParser();
-    var data = dom.parseFromString(testData, "text/xml");
-    //var data = this.fetchBucketData();
-    console.log(data);
+    //var dom = new window.DOMParser();
+    //var data = dom.parseFromString(testData, 'text/xml');
+    var data = this.fetchBucketData();
+    console.log('Data',data);
 
     //get bucket name
     this.bucketName = this.getNodeValue('Name', data);
@@ -183,18 +191,8 @@ export default class Bucket {
 
     // if shared link remove parent folders
     if(this.shared){
-      let path = this.shared.split("/");
-      let children = this._bucketRoot.children; 
-      try{
-        while(path.length>0){
-          let name = path.shift()
-          let folder = children.find(c => c.name === name);
-          console.log(name, folder);
-        }
-      }catch(e){
-        children = [];
-        alert(e);
-      }
+      // this could be done so much better 
+      this.trimTree();
     }
   }
 }

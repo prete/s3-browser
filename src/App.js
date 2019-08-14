@@ -1,7 +1,7 @@
 import React from "react";
 import "antd/dist/antd.css";
 import Bucket from "./Bucket"
-import { Breadcrumb, message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
+import { Typography, Breadcrumb, message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
 import moment from "moment";
 
 class App extends React.Component {
@@ -37,7 +37,7 @@ class App extends React.Component {
     }
     crumbs = crumbs.split('/')
     this.breadcrumbs = (
-      <Breadcrumb>
+      <Breadcrumb strong>
       {crumbs.map((item, key) =>        
         <Breadcrumb.Item key={key}>{item}</Breadcrumb.Item>
       )}
@@ -92,13 +92,13 @@ class App extends React.Component {
       width: "10%",
       render: (key, record, index) => {
         let download = (
-          <Tooltip title={`Download this file (${record.name})`}>
+          <Tooltip title={`Download this ${record.type}: ${record.name}`}>
             <Button icon="download" shape="round" onClick={this.handleDownload.bind(null, record)}/>
           </Tooltip>
         );
         return (
           <Button.Group size="small">
-            <Tooltip title={`Share this item (${record.name})`}>
+            <Tooltip title={`Share this ${record.type}: ${record.name}`}>
               <Button icon="link" shape="round" onClick={this.handleShare.bind(null, record)}/>
             </Tooltip>
             {record.type === "file" ? download : ""}
@@ -123,12 +123,7 @@ class App extends React.Component {
         } else {
           return "";
         }
-      }/*,
-      onCell: (record, index) => ({
-        onClick(e) {
-          console.log("Click cell", ` row ${index}`, record, e.target);
-        }
-      })*/
+      }
     },
     {
       title: "Size",
@@ -194,20 +189,12 @@ class App extends React.Component {
   }
 
   handleShare(record, event){
-    
-    function copyShareableLink(event){
-      message.destroy();
-      event.target.select();
-      document.execCommand("copy");
-      message.success('Link copied!');
-    }
-
     Modal.info({
       title: `Share this ${record.type} with others`,
       content: (
         <div>
           <span>Copy the following link:</span>
-          <Input id="shareable-link" addonAfter={<Icon type="link" />} value={record.share} onClick={copyShareableLink} readOnly/>
+          <Typography.Paragraph code copyable={{text: record.share, onCopy: f =>(message.success('Link copied!'))}}>{record.share}</Typography.Paragraph>
         </div>
       )
     });
@@ -216,7 +203,6 @@ class App extends React.Component {
   }
 
   handleDownload(record, event){
-    console.log(record);
     window.open(record.url);
     event.preventDefault();
   }
@@ -238,13 +224,10 @@ class App extends React.Component {
     this.setState({data: searchResults });
   }
 
-  //footer = () => <span>{this.state.files.length} file(s)</span>;
-  
-
   render() {
     return (
       <div>
-        {this.breadcrumbs}
+        <Typography.Title level={3}>Browsing: {this.state.bucket.name}/{this.state.bucket.shared}</Typography.Title>
         <Tooltip title="Search for file. Input at least 3 characaters.">
           <Input
             prefix={<Icon type="file-search" />}
@@ -258,7 +241,6 @@ class App extends React.Component {
           expandIcon={this.folderExpandIcon.bind(this)}
           columns={this.columns}
           dataSource={this.state.data}
-          //footer={this.footer}
           onRow={(record, index) => ({
             onClick: this.onRowClick.bind(null, record, index),
             onDoubleClick: this.onRowDoubleClick.bind(null, record, index)
