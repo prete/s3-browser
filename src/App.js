@@ -1,10 +1,11 @@
 import React from "react";
 import "antd/dist/antd.css";
 import Bucket from "./Bucket"
-import { Typography, Breadcrumb, message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
+import { Typography, message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
 import moment from "moment";
 
 class App extends React.Component {
+  //do I even need to use the whole state-thing?
   state = {
     bucket: {},
     seraching: false,
@@ -15,9 +16,10 @@ class App extends React.Component {
 
   constructor(props) {
     super(props);
-    this.breadcrumbs = <div></div>;
   }
 
+  //when the component is mounted
+  //get the bucket
   componentDidMount() {
     let bucket = new Bucket();
   
@@ -26,26 +28,11 @@ class App extends React.Component {
       tree: bucket.tree,
       files: bucket.files,
       data: bucket.tree
-    }, this.buildBreadcrumbs);
+    });
   }
 
-
-  buildBreadcrumbs(){
-    let crumbs = this.state.bucket.name;
-    if(this.state.bucket.shared){
-      crumbs += '/'+this.state.bucket.shared;
-    }
-    crumbs = crumbs.split('/')
-    this.breadcrumbs = (
-      <Breadcrumb strong>
-      {crumbs.map((item, key) =>        
-        <Breadcrumb.Item key={key}>{item}</Breadcrumb.Item>
-      )}
-      </Breadcrumb>
-    );
-  }
-
-  // src: https://stackoverflow.com/questions/20459630/javascript-human-readable-filesize
+  //bytes to human readable
+  //src: https://stackoverflow.com/questions/20459630/javascript-human-readable-filesize
   readableFileSize(size) {
     if (size === 0) return "0.00 B";
     var i = Math.floor(Math.log(size) / Math.log(1024));
@@ -58,14 +45,6 @@ class App extends React.Component {
 
   onRowClick = (record, index, event) => {
     console.log("Row click", { record: record, index: index, event: event });
-  };
-
-  onRowDoubleClick = (record, index, event) => {
-    console.log("Row double click", {
-      record: record,
-      index: index,
-      event: event
-    });
   };
 
   columns = [
@@ -172,6 +151,7 @@ class App extends React.Component {
     return iconName;
   }
 
+  //use different folder and file icons
   folderExpandIcon(props) {
     let iconName;
     let themeName="";
@@ -188,6 +168,7 @@ class App extends React.Component {
     
   }
 
+  //opens up the modal to show the user the shareable link
   handleShare(record, event){
     Modal.info({
       title: `Share this ${record.type} with others`,
@@ -202,13 +183,13 @@ class App extends React.Component {
     event.stopPropagation();
   }
 
+  //opens a new window with the full S3 file URL
   handleDownload(record, event){
     window.open(record.url);
     event.preventDefault();
   }
 
-  queryResult = [];
-
+  //search function
   async handleSearch(event) {
     var searchResults = [];
     var term = event.target.value.toLowerCase();
@@ -242,8 +223,7 @@ class App extends React.Component {
           columns={this.columns}
           dataSource={this.state.data}
           onRow={(record, index) => ({
-            onClick: this.onRowClick.bind(null, record, index),
-            onDoubleClick: this.onRowDoubleClick.bind(null, record, index)
+            onClick: this.onRowClick.bind(null, record, index)
           })}
           expandRowByClick
         />

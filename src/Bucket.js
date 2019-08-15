@@ -1,15 +1,13 @@
-//import { testData } from "./RawData";
-
 export default class Bucket {
 
   // gets the contents from the bucket as a tree
   get tree() {
-    return this._bucketRoot.children;
+    return this.bucketRoot.children;
   }
 
   // gets the contents of the bucket as a tree but returns only the root node
   get root(){
-    return this._bucketRoot;
+    return this.bucketRoot;
   }
 
   // gets the files in the bucket
@@ -23,7 +21,7 @@ export default class Bucket {
   
   // make empty files and tree
   _files = [];
-  _bucketRoot = {
+  bucketRoot = {
     name: '',
     key: '',
     type: 'bucket',
@@ -32,18 +30,19 @@ export default class Bucket {
     children: []
   };
 
+  //get bucket URL from current location
+  bucketUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':'+window.location.port : ''}`;  
 
+  // set base URL for the entry file (index.html)
+  url = `${this.bucketUrl}${window.location.pathname}`;
   constructor(){
     console.log('currentScript)', document.currentScript);
 
-    // get url from current location
-    this.bucketUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':'+window.location.port : ''}`;
-     
     // get url from config if present
     if (document.currentScript) { 
+      //the idea is to get the configuration straight from the tag script
+      //i.e. <script src='http://some.place/build.js' config-var1="foo" config-val2="bar"></script>
     }
-    
-    this.url = `${this.bucketUrl}${window.location.pathname}`;
 
     // check querystring to see if this is a shared url
     if(window.location.search){
@@ -82,7 +81,7 @@ export default class Bucket {
   addTreeNode(item) {
     var folders = item.key.split("/");
     folders.pop(); // remove file name
-    var path = this._bucketRoot;
+    var path = this.bucketRoot;
     while (folders.length !== 0) {
       var folder = folders.shift();
       // eslint-disable-next-line
@@ -105,7 +104,7 @@ export default class Bucket {
     
     path.children.push(item);
     path.children.sort(this.sorter);
-    this._bucketRoot.size += item.size;
+    this.bucketRoot.size += item.size;
   }
 
   // helper to get the node value from an element
@@ -156,27 +155,25 @@ export default class Bucket {
   // remove previous folders up to the shared one
   trimTree(){
     let path = this.shared.replace(/^\/|\/$/g, '').split('/');
-    let branch = this._bucketRoot.children;
+    let branch = this.bucketRoot.children;
     while(path.length>0){
       let name = path.shift()
       let item = branch.find(c => c.name === name);
       if(!item) break;
       branch = item.children;
     }
-    this._bucketRoot.children = branch;
+    this.bucketRoot.children = branch;
   }
 
-  // release the kraken and fetch the files
+  //fetch xml the bucket and parse it to get the files
   getContentes() {
     // get the data
-    //var dom = new window.DOMParser();
-    //var data = dom.parseFromString(testData, 'text/xml');
     var data = this.fetchBucketData();
     console.log('Data',data);
 
     //get bucket name
     this.bucketName = this.getNodeValue('Name', data);
-    this._bucketRoot.name = this.bucketName;
+    this.bucketRoot.name = this.bucketName;
 
     // build files from xml
     this.getFilesFromXML(data);

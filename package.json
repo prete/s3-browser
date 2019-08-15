@@ -2,7 +2,6 @@
   "name": "s3-browser",
   "version": "0.1.0",
   "private": true,
-  "homepage" : "http://prete.github.io/s3-browser",
   "dependencies": {
     "antd": "^3.21.2",
     "moment": "^2.24.0",
