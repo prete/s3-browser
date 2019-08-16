@@ -29,6 +29,8 @@ export default class Bucket {
     size: 0,
     children: []
   };
+  
+  _prefix = '';
 
   //get bucket URL from current location
   bucketUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':'+window.location.port : ''}`;  
@@ -36,11 +38,11 @@ export default class Bucket {
   // set base URL for the entry file (index.html)
   url = `${this.bucketUrl}${window.location.pathname}`;
   constructor(){
-    console.log('currentScript)', document.currentScript);
+    console.log('currentScript', document.currentScript);
 
     // get url from config if present
     if (document.currentScript) { 
-      //the idea is to get the configuration straight from the tag script
+      //the idea is to get extra configuration straight from the tag script
       //i.e. <script src='http://some.place/build.js' config-var1="foo" config-val2="bar"></script>
     }
 
@@ -123,10 +125,19 @@ export default class Bucket {
 
   // fetch xml data from the bucket
   fetchBucketData(marker){
+    // https://docs.aws.amazon.com/AmazonS3/latest/dev/ListingKeysHierarchy.html
     var url = this.bucketUrl;
-    if(marker){
-      url = `${this.bucketUrl}/?marker=${marker}`;
+    url += `?delimiter=/`;
+
+    // use prefix to request only the shared folder files
+    if(this.shared){
+      url += `&prefix=${this.shared}`;
     }
+
+    if(marker){
+      url += `&marker=${marker}`;
+    }
+
     var request = new XMLHttpRequest();
     request.open('GET', url, false);
     request.send(null);
@@ -153,17 +164,17 @@ export default class Bucket {
   }
 
   // remove previous folders up to the shared one
-  trimTree(){
-    let path = this.shared.replace(/^\/|\/$/g, '').split('/');
-    let branch = this.bucketRoot.children;
-    while(path.length>0){
-      let name = path.shift()
-      let item = branch.find(c => c.name === name);
-      if(!item) break;
-      branch = item.children;
-    }
-    this.bucketRoot.children = branch;
-  }
+  // trimTree(){
+  //   let path = this.shared.replace(/^\/|\/$/g, '').split('/');
+  //   let branch = this.bucketRoot.children;
+  //   while(path.length>0){
+  //     let name = path.shift()
+  //     let item = branch.find(c => c.name === name);
+  //     if(!item) break;
+  //     branch = item.children;
+  //   }
+  //   this.bucketRoot.children = branch;
+  // }
 
   //fetch xml the bucket and parse it to get the files
   getContentes() {
@@ -187,9 +198,9 @@ export default class Bucket {
     };
 
     // if shared link remove parent folders
-    if(this.shared){
+    //if(this.shared){
       // this could be done so much better 
-      this.trimTree();
-    }
+      //this.trimTree();
+    //}
   }
 }

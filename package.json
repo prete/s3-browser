@@ -11,7 +11,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && npm run set-version",
+    "set-version": "S3B_VERSION=`git log -1 --date=short --pretty=format:%cd` perl -i -pe 's/%S3B_VERSION%/$ENV{S3B_VERSION}/' build/index.html",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -28,5 +29,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "shx": "^0.3.2"
   }
 }
