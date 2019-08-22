@@ -67,11 +67,11 @@ class App extends React.Component {
     this.setState(state => {
       let breadcrumbsPath = '';
       state.breadcrumbs = <span>
-        <a href={this.browserUrl}>{this.bucket.name}</a> /
+        <a href={this.browserUrl}>{this.bucket.name}</a>
         {
           this.state.bucket.key.replace(/\/$/,"").split('/').map(bread => {
             breadcrumbsPath += bread + '/';
-            return <span><a href={this.browserUrl+'?share='+breadcrumbsPath}>{bread}</a> / </span>
+            return <span>/ <a href={this.browserUrl+'?share='+breadcrumbsPath}>{bread}</a> / </span>
           })
         }
         </span>;
@@ -457,21 +457,16 @@ class App extends React.Component {
           visible={this.state.search.visible}>
           
           <Table dataSource={this.state.search.results}>
-              <Table.Column
-                title="File"
-                dataIndex="key"
-                key="key"
-                render={key => (<Tag color="blue" key={key}>{key.split('/').pop()}</Tag>)}
-              />
+              <Table.Column title="File" dataIndex="key" key="key"render={key => {
+                return (<Tag color="blue" key={key}>{key}</Tag>);
+            }}/>
               <Table.Column title="Last modified" dataIndex="modified" key="modified" />
               <Table.Column
                 title="Action"
                 key="action"
-                render={(text, record) => (
-                  <Tooltip title={`Download this ${record.type}: ${record.name}`}>
-                    <Button icon="download" shape="round" onClick={this.handleDownload.bind(null, record)}/>
-                  </Tooltip>
-                )}
+                render={(text, record) => {
+                  return (<Button icon="download" shape="round" onClick={this.handleDownload.bind(null, {url: `${this.bucket.url}/${record.key}`})}/>)
+                }}
               />
             </Table>
         </Drawer>
