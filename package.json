@@ -2,6 +2,7 @@
   "name": "s3-browser",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://%CDN_URL%",
   "dependencies": {
     "antd": "^3.21.2",
     "moment": "^2.24.0",
@@ -11,8 +12,14 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && npm run set-version",
-    "set-version": "S3B_VERSION=`git log -1 --date=short --pretty=format:%cd` perl -i -pe 's/%S3B_VERSION%/$ENV{S3B_VERSION}/' build/index.html",
+    "build": "react-scripts build",
+    "build-and-deploy": "react-scripts build && npm run post-build && npm run deploy",
+    "post-build":"npm run set-version && npm run set-url-s3 && npm run rename-index",
+    "set-version": "S3B_VERSION=`git log -1 --date=short --pretty=format:%cd` perl -i -p -e 's|%S3B_VERSION%|$ENV{S3B_VERSION}|g' build/index.html",
+    "set-url-s3": "perl -i -p -e 's|%CDN_URL%|https://s3browser.cog.sanger.ac.uk|g' build/index.html build/asset-manifest.json build/precache-manifest*",
+    "rename-index": "mv build/index.html build/browser.html",
+    "clean-s3": "rm .DS_Store && s3cmd del --recursive --force s3://s3browser/",
+    "deploy": "s3cmd put setacl --acl-public --recursive build/ s3://s3browser/",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -30,7 +37,5 @@
       "last 1 safari version"
     ]
   },
-  "devDependencies": {
-    "shx": "^0.3.2"
-  }
+  "devDependencies": {}
 }

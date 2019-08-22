@@ -1,35 +1,258 @@
 import React from "react";
 import "antd/dist/antd.css";
-import Bucket from "./Bucket"
-import { Typography, message, Modal, Table, Tag, Button, Icon, Input, Tooltip} from "antd";
+import { Drawer, Typography, message, Modal, Table, Tag, Button, Icon, Tooltip} from "antd";
 import moment from "moment";
 
+
 class App extends React.Component {
+
+  bucket = {
+    key: '',
+    type: 'bucket',
+    url: `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':'+window.location.port : ''}`,
+    children:[]
+  };
+
   //do I even need to use the whole state-thing?
   state = {
-    bucket: {},
-    seraching: false,
-    tree: [],
-    files: [],
-    data: []
+    bucket: this.bucket,
+    search: {
+      fetching: false,
+      visible: false,
+      results: []
+    },
+    fetching: false,
+    breadcrumbs: ''
   };
+
+  browserUrl = `${this.bucket.url}${window.location.pathname}`;
 
   constructor(props) {
     super(props);
+  
+    // parse querystring to see if this is a shared link
+    if(window.location.search){
+      let params = window.location.search
+        .slice(1)
+        .split('&')
+        .map(p => p.split('='))
+        .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {});
+      if('shared' in params){
+        this.bucket.key = params.shared;
+      }
+    }
   }
 
-  //when the component is mounted
-  //get the bucket
+  //when the component is mounted => go get bucket data
   componentDidMount() {
-    let bucket = new Bucket();
-  
-    this.setState({
-      bucket: bucket,
-      tree: bucket.tree,
-      files: bucket.files,
-      data: bucket.tree
+    console.log("ComponentDidMount");
+
+    // fetch base level files and fodlers
+    this.getAllTheData({prefix: this.bucket.key}).then(data =>{
+      this.setupBucket(data);
     });
   }
+
+  setupBucket(data){
+    // create the bucket structure
+    this.bucket = {
+      ...this.bucket,
+      name: this.getNodeValue('Name', data),
+      share: `${this.browserUrl}`
+    };
+    
+    // set the window title with the bucket name
+    window.document.title = window.document.title + ' | ' + this.bucket.name + this.bucket.key;
+
+    this.setState(state => {
+      let breadcrumbsPath = '';
+      state.breadcrumbs = <span>
+        <a href={this.browserUrl}>{this.bucket.name}</a> /
+        {
+          this.state.bucket.key.replace(/\/$/,"").split('/').map(bread => {
+            breadcrumbsPath += bread + '/';
+            return <span><a href={this.browserUrl+'?share='+breadcrumbsPath}>{bread}</a> / </span>
+          })
+        }
+        </span>;
+      return state;
+    });
+
+    this.addChildren(data, this.bucket);
+    //this.getFolderContents(this.bucket);
+  }
+
+  async getAllTheData(options){
+    this.setState( state => {
+      state.fetching = true;
+      return state;
+    });
+
+    var data = await this.request(options);
+    while(this.getNodeValue('IsTruncated', data) === 'true'){
+      var marker = this.getNodeValue('NextMarker', data);
+      data += await this.request({
+        prefix: options.prefix, 
+        marker: marker
+      });
+    };
+
+    this.setState( state => {
+      state.fetching = false;
+      return state;
+    });
+
+    return data;
+  }
+
+
+  async request(options){
+    options = {...options};
+    options.prefix = 'prefix' in options ? options.prefix : '';
+    
+    console.log("Request Options", options);
+
+    let params = [];
+    params.push(`delimiter=/`);
+    params.push(`prefix=${options.prefix}`);
+    if(options.marker){
+      params.push(`marker=${options.marker}`);
+    }
+    
+    try {
+      const url = this.bucket.url +"?"+params.join("&");
+      const request = await fetch(url);
+      const text = await request.text();
+      return (new window.DOMParser()).parseFromString(text, "text/xml");
+    }
+    catch (e) {
+      return console.error(e);
+    }
+  }
+
+  async getFolderContents(folder, cb){
+    if(folder.type === "file" || folder.loaded){
+      return;
+    }
+
+    let data = await this.getAllTheData({prefix: folder.key});
+    let files = this.getFilesFromXML(data);      
+    folder.children.push(...files);
+    //this.insertOrdered(...files, folder.children);
+    let childrenOfFolder = this.getFoldersFromXML(data);
+    for(let childFolder of childrenOfFolder){
+      //this.insertOrdered(childFolder, folder.children);
+      folder.children.push(childFolder);
+    }
+
+    folder.children.sort(this.sorter);
+    folder.loaded = true;
+
+    if(cb) {
+      cb();
+    }
+  }
+
+  addChildren(data, folder){
+    let files = this.getFilesFromXML(data);      
+    folder.children.push(...files);
+    //this.insertOrdered(...files, folder.children);
+    let childrenOfFolder = this.getFoldersFromXML(data);
+    for(let childFolder of childrenOfFolder){
+      //this.insertOrdered(childFolder, folder.children);
+      folder.children.push(childFolder);
+    }
+
+    folder.children.sort(this.sorter);
+    folder.loaded = true;
+
+    this.setState(state => {
+      state.bucket = this.bucket;
+      return state;
+    })
+  }
+
+
+  // read the XML and get the Contents (files)
+  // fitler the files if this is from a shared link
+  getFilesFromXML(data){
+    let contents = data.getElementsByTagName("Contents");
+    let files = [];
+    for(let c of contents){
+      files.push(this.parseContents(c));      
+    }
+    return files;
+  }
+
+  // read the XML and get the Contents (files)
+  // fitler the files if this is from a shared link
+  getFoldersFromXML(data){
+    let prefixes = data.getElementsByTagName("CommonPrefixes");
+    let folders = [];
+    for(let p of prefixes){
+      folders.push(this.parseCommonPrefixes(p));
+    }
+    return folders;
+  }
+
+  // helper to get the node value from an element
+  getNodeValue(tag, element) {
+    return element.getElementsByTagName(tag)[0].childNodes[0].nodeValue;
+  }
+
+  // parse <Contents> element to get file information
+  parseContents(item) {
+    var file = {
+      key: this.getNodeValue("Key", item),
+      modified: this.getNodeValue("LastModified", item),
+      size: parseInt(this.getNodeValue("Size", item)),
+      type: "file"
+    };
+    file.name = file.key.split("/").pop();
+    file.extension = file.name.split(".").pop();
+    file.url = `${this.bucket.url}/${file.key}`;
+    file.share = file.url;
+    return file;
+  }
+
+  // parse <CommonPrefixes> element to get folder names
+  parseCommonPrefixes(item){
+    var folder = {
+      type: "folder",
+      size: 0,
+      key: this.getNodeValue("Prefix", item),
+      loaded: false,
+      children: []
+    }
+    folder.name = folder.key.replace(/\/$/,"").split("/").pop();
+    folder.share = `${this.browserUrl}?shared=${folder.key}`;
+    return folder;
+  }
+
+  sorter(a, b) {
+    if (a.type === b.type) {
+      return a.name.localeCompare(b.name);
+    } else {
+      return a.type === "folder" ? -1 : 1;
+    }
+  }
+
+  insertOrdered(newItem, collection){
+    console.log(newItem, collection);
+    for (let i = 0, len = collection.length; i < len; i++) {
+      let otherItem = collection[i];
+      if ((newItem.type === otherItem.type) && (newItem.name.localeCompare(otherItem.name)<1)) {
+        collection.splice(i, 0, newItem);
+        break;
+      } else if(newItem.type === "folder"){
+          collection.splice(i, 0, newItem);
+        break;
+      }
+    }
+  }
+  
+  
+  /////////////////////////
 
   //bytes to human readable
   //src: https://stackoverflow.com/questions/20459630/javascript-human-readable-filesize
@@ -43,9 +266,15 @@ class App extends React.Component {
     );
   }
 
-  onRowClick = (record, index, event) => {
-    console.log("Row click", { record: record, index: index, event: event });
-  };
+  // onRowClick = (record, index, event) => {
+  //   console.log("Row click", { record: record, index: index, event: event });
+  //   this.getFolderContents(record);
+    
+  //   this.setState(state => {
+  //     state.bucket = this.bucket;
+  //     return state;
+  //   });
+  // };
 
   columns = [
     {
@@ -189,42 +418,74 @@ class App extends React.Component {
     event.preventDefault();
   }
 
-  //search function
-  async handleSearch(event) {
-    var searchResults = [];
-    var term = event.target.value.toLowerCase();
-    if (term && term.length >= 3) {
-      this.setState({searching:true});
-      searchResults = this.state.files.filter(f =>
-        f.name.toLowerCase().includes(term)
-      );
-    } else {
-      this.setState({searching:false});
-      searchResults = this.state.tree;
-    }
-    this.setState({data: searchResults });
+  onRowExpand(expanded, record){
+    console.log("On row expand");
+
+    this.getFolderContents(record, ()=>{
+      this.setState(state => {
+        state.bucket = this.bucket;
+        return state;
+      });
+    });
   }
+
+  showDrawer = () => {
+    this.setState(state =>{
+      state.search = {...state.search, visible: true};
+      return state;
+    });
+  };
+
+  onDrawerClose = () => {
+    this.setState(state =>{
+      state.search = {...state.search, visible: false};
+      return state;
+    });
+  };
+
 
   render() {
     return (
       <div>
-        <Typography.Title level={3}>Browsing: {this.state.bucket.name}/{this.state.bucket.shared}</Typography.Title>
-        <Tooltip title="Search for file. Input at least 3 characaters.">
-          <Input
-            prefix={<Icon type="file-search" />}
-            placeholder="Search..."
-            onChange={this.handleSearch.bind(this)}
-          />
-        </Tooltip>
+        <Typography.Title level={3}>Browsing: {this.state.breadcrumbs}</Typography.Title>    
+        <Button type="primary" onClick={this.showDrawer}>Search</Button>
+        <Drawer
+          title="Search"
+          placement="bottom"
+          closable={false}
+          onClose={this.onDrawerClose}
+          visible={this.state.search.visible}>
+          
+          <Table dataSource={this.state.search.results}>
+              <Table.Column
+                title="File"
+                dataIndex="key"
+                key="key"
+                render={key => (<Tag color="blue" key={key}>{key.split('/').pop()}</Tag>)}
+              />
+              <Table.Column title="Last modified" dataIndex="modified" key="modified" />
+              <Table.Column
+                title="Action"
+                key="action"
+                render={(text, record) => (
+                  <Tooltip title={`Download this ${record.type}: ${record.name}`}>
+                    <Button icon="download" shape="round" onClick={this.handleDownload.bind(null, record)}/>
+                  </Tooltip>
+                )}
+              />
+            </Table>
+        </Drawer>
         <Table
           size="medium"
           pagination={false}
           expandIcon={this.folderExpandIcon.bind(this)}
           columns={this.columns}
-          dataSource={this.state.data}
-          onRow={(record, index) => ({
+          dataSource={this.state.bucket.children}
+          /*onRow={(record, index) => ({
             onClick: this.onRowClick.bind(null, record, index)
-          })}
+          })}*/
+          onExpand={this.onRowExpand.bind(this)}
+          loading={this.state.fetching}
           expandRowByClick
         />
       </div>
