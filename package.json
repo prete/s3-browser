@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "homepage": "https://%CDN_URL%",
+  "buckets":{
+    "production": "s3browser",
+    "development": "mp33-test"
+  },
   "dependencies": {
     "antd": "^3.21.2",
     "moment": "^2.24.0",
@@ -12,14 +16,16 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
-    "build-and-deploy": "react-scripts build && npm run post-build && npm run deploy",
-    "post-build":"npm run set-version && npm run set-url-s3 && npm run rename-index",
-    "set-version": "S3B_VERSION=`git log -1 --date=short --pretty=format:%cd` perl -i -p -e 's|%S3B_VERSION%|$ENV{S3B_VERSION}|g' build/index.html",
-    "set-url-s3": "perl -i -p -e 's|%CDN_URL%|https://s3browser.cog.sanger.ac.uk|g' build/index.html build/asset-manifest.json build/precache-manifest*",
-    "rename-index": "mv build/index.html build/browser.html",
-    "clean-s3": "rm .DS_Store && s3cmd del --recursive --force s3://s3browser/",
-    "deploy": "s3cmd put setacl --acl-public --recursive build/ s3://s3browser/",
+    "build": "react-scripts build && npm run post:build",
+    "post:build":"npm run set:version",
+    "set:version": "COMMIT_DATE=`git log -1 --date=short --pretty=format:%cd` perl -i -p -e 's|%COMMIT_DATE%|$ENV{COMMIT_DATE}|g' build/index.html",
+    "file:operations": "mv build/index.html build/browser.html && rm -f build/.DS_Store",
+    "dev:deploy": "npm run build && npm run dev:set:url && npm run file:operations && npm run dev:upload",
+    "dev:set:url": "perl -i -p -e 's|%CDN_URL%|https://$ENV{npm_package_buckets_development}.cog.sanger.ac.uk|g' build/index.html build/asset-manifest.json build/precache-manifest*",
+    "dev:upload": "s3cmd put setacl --acl-public --recursive build/ s3://${npm_package_buckets_development}",
+    "prod:deploy": "npm run build && npm run prod:set:url && npm run file:operations && npm run prod:upload",
+    "pord:set:url": "perl -i -p -e 's|%CDN_URL%|https://$ENV{npm_package_buckets_production}.cog.sanger.ac.uk/$ENV{npm_package_version}|g' build/index.html build/asset-manifest.json build/precache-manifest*",
+    "prod:upload": "s3cmd put setacl --acl-public --recursive build/ s3://${npm_package_buckets_production}/${npm_package_version}",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

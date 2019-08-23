@@ -1,6 +1,6 @@
 import React from "react";
 import "antd/dist/antd.css";
-import { Drawer, Typography, message, Modal, Table, Tag, Button, Icon, Tooltip} from "antd";
+import { Drawer, Typography, message, Modal, Input, Table, Tag, Button, Icon, Tooltip} from "antd";
 import moment from "moment";
 
 
@@ -78,8 +78,13 @@ class App extends React.Component {
       return state;
     });
 
-    this.addChildren(data, this.bucket);
-    //this.getFolderContents(this.bucket);
+    //this.addChildren(data, this.bucket);
+    this.getFolderContents(this.bucket, ()=>{
+      this.setState(state => {
+        state.bucket = this.bucket;
+        return state;
+      }
+    )});
   }
 
   async getAllTheData(options){
@@ -448,14 +453,22 @@ class App extends React.Component {
     return (
       <div>
         <Typography.Title level={3}>Browsing: {this.state.breadcrumbs}</Typography.Title>    
-        <Button type="primary" onClick={this.showDrawer}>Search</Button>
+        <Button type="primary" shape="circle" icon="search" onClick={this.showDrawer}/>
         <Drawer
           title="Search"
           placement="bottom"
           closable={false}
           onClose={this.onDrawerClose}
           visible={this.state.search.visible}>
-          
+           <Input
+            placeholder="Enter filename"
+            prefix={<Icon type="search"/>}
+            suffix={
+              <Tooltip title="Search for at least 3 characters in the filename.">
+                <Icon type="info-circle" />
+              </Tooltip>
+            }
+          />
           <Table dataSource={this.state.search.results}>
               <Table.Column title="File" dataIndex="key" key="key"render={key => {
                 return (<Tag color="blue" key={key}>{key}</Tag>);
