@@ -24,8 +24,8 @@
     "dev:set:url": "perl -i -p -e 's|%CDN_URL%|https://$ENV{npm_package_buckets_development}.cog.sanger.ac.uk|g' build/index.html build/asset-manifest.json build/precache-manifest*",
     "dev:upload": "s3cmd put setacl --acl-public --recursive build/ s3://${npm_package_buckets_development}",
     "prod:deploy": "npm run build && npm run prod:set:url && npm run file:operations && npm run prod:upload",
-    "pord:set:url": "perl -i -p -e 's|%CDN_URL%|https://$ENV{npm_package_buckets_production}.cog.sanger.ac.uk/$ENV{npm_package_version}|g' build/index.html build/asset-manifest.json build/precache-manifest*",
-    "prod:upload": "s3cmd put setacl --acl-public --recursive build/ s3://${npm_package_buckets_production}/${npm_package_version}",
+    "prod:set:url": "perl -i -p -e 's|%CDN_URL%|https://$ENV{npm_package_buckets_production}.cog.sanger.ac.uk/$ENV{npm_package_version}|g' build/index.html build/asset-manifest.json build/precache-manifest*",
+    "prod:upload": "s3cmd put setacl --acl-public --recursive build/ s3://${npm_package_buckets_production}/${npm_package_version}/",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

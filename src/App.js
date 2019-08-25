@@ -1,8 +1,7 @@
 import React from "react";
 import "antd/dist/antd.css";
-import { Drawer, Typography, message, Modal, Input, Table, Tag, Button, Icon, Tooltip} from "antd";
+import { Breadcrumb, Typography, message, Modal, Input, Table, Tag, Button, Icon, Tooltip} from "antd";
 import moment from "moment";
-
 
 class App extends React.Component {
 
@@ -15,7 +14,8 @@ class App extends React.Component {
 
   //do I even need to use the whole state-thing?
   state = {
-    bucket: this.bucket,
+    //bucket: this.bucket,
+    data: [],
     search: {
       fetching: false,
       visible: false,
@@ -67,21 +67,20 @@ class App extends React.Component {
     this.setState(state => {
       let breadcrumbsPath = '';
       state.breadcrumbs = <span>
-        <a href={this.browserUrl}>{this.bucket.name}</a>
+        <a href={this.browserUrl}>{this.bucket.name+'/'}</a>
         {
-          this.state.bucket.key.replace(/\/$/,"").split('/').map(bread => {
+          this.bucket.key.replace(/\/$/,"").split('/').map(bread => {
             breadcrumbsPath += bread + '/';
-            return <span>/ <a href={this.browserUrl+'?share='+breadcrumbsPath}>{bread}</a> / </span>
+            return <span> <a href={this.browserUrl+'?shared='+breadcrumbsPath}>{bread}</a> / </span>
           })
         }
         </span>;
       return state;
     });
 
-    //this.addChildren(data, this.bucket);
     this.getFolderContents(this.bucket, ()=>{
       this.setState(state => {
-        state.bucket = this.bucket;
+        state.data = this.bucket.children;
         return state;
       }
     )});
@@ -114,12 +113,12 @@ class App extends React.Component {
   async request(options){
     options = {...options};
     options.prefix = 'prefix' in options ? options.prefix : '';
-    
-    console.log("Request Options", options);
 
     let params = [];
-    params.push(`delimiter=/`);
-    params.push(`prefix=${options.prefix}`);
+    if(!options.raw){
+      params.push(`delimiter=/`);
+      params.push(`prefix=${options.prefix}`);
+    }
     if(options.marker){
       params.push(`marker=${options.marker}`);
     }
@@ -172,7 +171,7 @@ class App extends React.Component {
     folder.loaded = true;
 
     this.setState(state => {
-      state.bucket = this.bucket;
+      state.data = this.bucket.children;
       return state;
     })
   }
@@ -271,16 +270,6 @@ class App extends React.Component {
     );
   }
 
-  // onRowClick = (record, index, event) => {
-  //   console.log("Row click", { record: record, index: index, event: event });
-  //   this.getFolderContents(record);
-    
-  //   this.setState(state => {
-  //     state.bucket = this.bucket;
-  //     return state;
-  //   });
-  // };
-
   columns = [
     {
       title: "Name",
@@ -306,16 +295,21 @@ class App extends React.Component {
       render: (key, record, index) => {
         let download = (
           <Tooltip title={`Download this ${record.type}: ${record.name}`}>
-            <Button icon="download" shape="round" onClick={this.handleDownload.bind(null, record)}/>
+            <Tag color="green">
+              <a href={record.url} download><Icon type="download" shape="round"/></a>
+            </Tag>
           </Tooltip>
         );
         return (
-          <Button.Group size="small">
+          <div>
             <Tooltip title={`Share this ${record.type}: ${record.name}`}>
-              <Button icon="link" shape="round" onClick={this.handleShare.bind(null, record)}/>
+              <Tag color="geekblue">
+                <Icon type="link" shape="round" onClick={this.handleShare.bind(null, record)}/>
+              </Tag>
+              
             </Tooltip>
             {record.type === "file" ? download : ""}
-          </Button.Group>
+          </div>
         );
       }
     },
@@ -346,9 +340,9 @@ class App extends React.Component {
       render: (size, record, index) => {
         let sizeElement;
         if (size) {
-          let color = record.type === "file" ? "geekblue" : "";
+          //let color = record.type === "file" ? "geekblue" : "";
           sizeElement = (
-            <Tag color={color} size="small">
+            <Tag /*color={color}*/ size="small">
               {this.readableFileSize(size)}
             </Tag>
           );
@@ -428,70 +422,102 @@ class App extends React.Component {
 
     this.getFolderContents(record, ()=>{
       this.setState(state => {
-        state.bucket = this.bucket;
+        state.data = this.bucket.children;
         return state;
       });
     });
   }
 
-  showDrawer = () => {
-    this.setState(state =>{
-      state.search = {...state.search, visible: true};
+  async enterSearch(searchTerm){
+    if(searchTerm.length < 3){
+      this.setState(state =>{
+        state.fetching = false;
+        state.search.results = [];
+        state.data = this.bucket.children;
+        return state;
+      });
+      return;
+    }
+
+    this.setState(state =>{ 
+      state.fetching = true;
+      state.search.results = [];
+    });
+
+    var results = [];
+
+    var data = await this.request({raw: true});
+    results.push(...this.getFilesFromXML(data).filter(f => f.name.indexOf(searchTerm)>0));
+
+    while(this.getNodeValue('IsTruncated', data) === 'true'){
+      var marker = this.getNodeValue('NextMarker', data);
+      data = await this.request({
+        raw: true,
+        marker: marker
+      });
+      results.push(...this.getFilesFromXML(data).filter(f => f.name.indexOf(searchTerm)>0));
+    };
+
+    results.sort(this.sorter);
+
+    this.setState(state => {
+      state.fetching = false;
+      state.data = results;
       return state;
     });
-  };
 
-  onDrawerClose = () => {
-    this.setState(state =>{
-      state.search = {...state.search, visible: false};
+    console.log(searchTerm);
+  }
+
+  addToSearchResults(xml, searchTerm){
+    this.setState(state => {
+      state.search.results.push(...this.getFilesFromXML(xml).filter(f => f.name.indexOf(searchTerm)>0));
+      state.search.results.sort(this.sorter);
       return state;
     });
-  };
+  }
 
+  searchButton = (<Button type="primary" icon="search" loading={this.state.search.fetching} onClick={this.enterSearch}>Serach</Button>);
+  searchInput = ( <Input.Search
+    size="large"
+    placeholder="Search for file"
+    enterButton="Search"
+    onSearch={value => this.enterSearch(value)}
+  />);
 
+  breadcrumbs = () =>{
+    let breadcrumbsPath = '';
+
+    return (
+      <Breadcrumb separator="/">
+        <Breadcrumb.Item>
+          <Typography.Text mark>Path</Typography.Text>
+        </Breadcrumb.Item>
+        <Breadcrumb.Item>
+          <a href={this.browserUrl}><Icon type="home" /> {this.bucket.name}</a>
+        </Breadcrumb.Item>
+        {
+          this.bucket.key.replace(/\/$/,"").split('/').map(bread => {
+            if(bread.length === 0)return;
+            breadcrumbsPath += bread + '/';
+            return (<Breadcrumb.Item primary>
+              <a href={this.browserUrl+'?shared='+breadcrumbsPath}><Icon type="folder" /> {bread}</a>
+            </Breadcrumb.Item>);
+          })
+        }
+    </Breadcrumb>)
+  }
   render() {
     return (
       <div>
-        <Typography.Title level={3}>Browsing: {this.state.breadcrumbs}</Typography.Title>    
-        <Button type="primary" shape="circle" icon="search" onClick={this.showDrawer}/>
-        <Drawer
-          title="Search"
-          placement="bottom"
-          closable={false}
-          onClose={this.onDrawerClose}
-          visible={this.state.search.visible}>
-           <Input
-            placeholder="Enter filename"
-            prefix={<Icon type="search"/>}
-            suffix={
-              <Tooltip title="Search for at least 3 characters in the filename.">
-                <Icon type="info-circle" />
-              </Tooltip>
-            }
-          />
-          <Table dataSource={this.state.search.results}>
-              <Table.Column title="File" dataIndex="key" key="key"render={key => {
-                return (<Tag color="blue" key={key}>{key}</Tag>);
-            }}/>
-              <Table.Column title="Last modified" dataIndex="modified" key="modified" />
-              <Table.Column
-                title="Action"
-                key="action"
-                render={(text, record) => {
-                  return (<Button icon="download" shape="round" onClick={this.handleDownload.bind(null, {url: `${this.bucket.url}/${record.key}`})}/>)
-                }}
-              />
-            </Table>
-        </Drawer>
+        {this.breadcrumbs()}
+        {this.searchInput}
         <Table
           size="medium"
           pagination={false}
           expandIcon={this.folderExpandIcon.bind(this)}
           columns={this.columns}
-          dataSource={this.state.bucket.children}
-          /*onRow={(record, index) => ({
-            onClick: this.onRowClick.bind(null, record, index)
-          })}*/
+          dataSource={this.state.data}
           onExpand={this.onRowExpand.bind(this)}
           loading={this.state.fetching}
           expandRowByClick
