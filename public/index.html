@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
     <!-- S3 Browser version, set at build time -->
-    <meta name="s3-browser-version" content="%S3B_VERSION%"/>
+    <meta name="commit-date" content="%COMMIT_DATE%"/>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <!--
@@ -23,7 +23,7 @@
     -->
     <title>S3 Browser</title>
   </head>
-  <body onerror="alert('Not working? contact mp33@sanger.ac.uk'">
+  <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div class="mount-s3-tree"></div>
     <!--
