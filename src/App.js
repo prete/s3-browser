@@ -300,6 +300,13 @@ class App extends React.Component {
             </Tag>
           </Tooltip>
         );
+        let view = (
+          <Tooltip title={`View this ${record.type}: ${record.name}`}>
+            <Tag color="purple">
+              <a href={record.url} target="_blank"><Icon type="eye" shape="round"/></a>
+            </Tag>
+          </Tooltip>
+        );
         return (
           <div>
             <Tooltip title={`Share this ${record.type}: ${record.name}`}>
@@ -308,7 +315,9 @@ class App extends React.Component {
               </Tag>
               
             </Tooltip>
+            {record.type === "file" ? view : ""}
             {record.type === "file" ? download : ""}
+            
           </div>
         );
       }
